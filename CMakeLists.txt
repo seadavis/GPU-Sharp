@@ -13,7 +13,7 @@ find_package(OpenCL REQUIRED)
 include_directories(${OpenCL_INCLUDE_DIRS})
 
 # Add source to this project's executable.
-add_executable (VecAdd "VecAdd.cpp" "VecAdd.h" "err_code.h")
+add_executable (VecAdd "VecAdd.cpp" "VecAdd.h" "err_code.h" "Matrix.h" "Matrix.cpp")
 target_link_libraries(VecAdd ${OpenCL_LIBRARIES})
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)

@@ -2,6 +2,7 @@
 //
 
 #include "VecAdd.h"
+#include "Matrix.h"
 #define __CL_ENABLE_EXCEPTIONS
 
 #include "cl.hpp"
@@ -25,37 +26,20 @@
 //------------------------------------------------------------------------------
 
 #define TOL    (0.001)   // tolerance used in floating point comparisons
-#define LENGTH (1024)    // length of vectors a, b, and c
+#define ROWS (2)
+#define COLUMNS (2)
+#define LENGTH (4)    // length of vectors a, b, and c
 
 using namespace std;
 
 int main(void)
 {
-    std::vector<float> h_a(LENGTH);                // a vector 
-    std::vector<float> h_b(LENGTH);                // b vector 	
-    std::vector<float> h_c(LENGTH, 0xdeadbeef);   // c vector (result)
-    std::vector<float> h_d(LENGTH, 0xdeadbeef);   // d vector (result)
-    std::vector<float> h_e(LENGTH);               // e vector
-    std::vector<float> h_f(LENGTH, 0xdeadbeef);   // f vector (result)
-    std::vector<float> h_g(LENGTH);               // g vector
+    Matrix m1(ROWS, COLUMNS);
+    Matrix m2(ROWS, COLUMNS);
 
-    cl::Buffer d_a;                       // device memory used for the input  a vector
-    cl::Buffer d_b;                       // device memory used for the input  b vector
-    cl::Buffer d_c;                       // device memory used for the output c vector
-    cl::Buffer d_d;                       // device memory used for the output d vector
-    cl::Buffer d_e;                       // device memory used for the input e vector
-    cl::Buffer d_f;                       // device memory used for the output f vector
-    cl::Buffer d_g;                       // device memory used for the input g vector
-
-    // Fill vectors a and b with random float values
-    int count = LENGTH;
-    for (int i = 0; i < count; i++)
-    {
-        h_a[i] = rand() / (float)RAND_MAX;
-        h_b[i] = rand() / (float)RAND_MAX;
-        h_e[i] = rand() / (float)RAND_MAX;
-        h_g[i] = rand() / (float)RAND_MAX;
-    }
+    cl::Buffer inputM1Buffer;
+    cl::Buffer inputM2Buffer;
+    cl::Buffer outputBuffer;                    
 
     try
     {
@@ -64,69 +48,32 @@ int main(void)
 
         // Load in kernel source, creating a program object for the context
 
-        cl::Program program(context, util::loadProgram("../../../add.cl"), true);
+        cl::Program program(context, util::loadProgram("../../../mmul.cl"), true);
 
         // Get the command queue
         cl::CommandQueue queue(context);
 
         // Create the kernel functor
 
-        cl::make_kernel<cl::Buffer, cl::Buffer, cl::Buffer, int> vadd(program, "vadd");
+        cl::make_kernel<cl::Buffer, cl::Buffer, cl::Buffer, long> mmul(program, "mmull");
 
-        d_a = cl::Buffer(context, h_a.begin(), h_a.end(), true);
-        d_b = cl::Buffer(context, h_b.begin(), h_b.end(), true);
-        d_e = cl::Buffer(context, h_e.begin(), h_e.end(), true);
-        d_g = cl::Buffer(context, h_g.begin(), h_g.end(), true);
+        auto outputVector = vector<double>(LENGTH);
+        inputM1Buffer = cl::Buffer(context, m1.data().begin(), m1.data().end(), true);
+        inputM2Buffer = cl::Buffer(context, m2.data().begin(), m2.data().end(), true);
+        outputBuffer = cl::Buffer(context, outputVector.begin(), outputVector.end(), true);
 
-        d_c = cl::Buffer(context, CL_MEM_READ_WRITE, sizeof(float) * LENGTH);
-        d_d = cl::Buffer(context, CL_MEM_READ_WRITE, sizeof(float) * LENGTH);
-        d_f = cl::Buffer(context, CL_MEM_WRITE_ONLY, sizeof(float) * LENGTH);
-
-        vadd(
+        mmul(
             cl::EnqueueArgs(
                 queue,
-                cl::NDRange(count)),
-            d_a,
-            d_b,
-            d_c,
-            count);
+                cl::NDRange(COLUMNS, ROWS)),
+            inputM1Buffer,
+            inputM2Buffer,
+            outputBuffer, ROWS);
 
-        vadd(
-            cl::EnqueueArgs(
-                queue,
-                cl::NDRange(count)),
-            d_e,
-            d_c,
-            d_d,
-            count);
+        
+        Matrix result(outputVector, COLUMNS,ROWS);
 
-        vadd(
-            cl::EnqueueArgs(
-                queue,
-                cl::NDRange(count)),
-            d_g,
-            d_d,
-            d_f,
-            count);
-
-        cl::copy(queue, d_f, h_f.begin(), h_f.end());
-
-        // Test the results
-        int correct = 0;
-        float tmp;
-        for (int i = 0; i < count; i++)
-        {
-            tmp = h_a[i] + h_b[i] + h_e[i] + h_g[i];     // assign element i of a+b+e+g to tmp
-            tmp -= h_f[i];                               // compute deviation of expected and output result
-            if (tmp * tmp < TOL * TOL)                        // correct if square deviation is less than tolerance squared
-                correct++;
-            else {
-                printf(" tmp %f h_a %f h_b %f h_e %f h_g %f h_f %f\n", tmp, h_a[i], h_b[i], h_e[i], h_g[i], h_f[i]);
-            }
-        }
-
-        // summarize results
-        printf("C = A+B+E+G:  %d out of %d results were correct.\n", correct, count);
+        std::cout << result.print();
 
     }
     catch (cl::Error err) {
