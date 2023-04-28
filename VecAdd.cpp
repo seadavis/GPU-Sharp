@@ -34,8 +34,8 @@ using namespace std;
 
 int main(void)
 {
-    Matrix m1(ROWS, COLUMNS);
-    Matrix m2(ROWS, COLUMNS);
+    Matrix m1(COLUMNS, ROWS);
+    Matrix m2(COLUMNS, ROWS);
 
     cl::Buffer inputM1Buffer;
     cl::Buffer inputM2Buffer;
